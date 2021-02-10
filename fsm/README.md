@@ -24,8 +24,8 @@ state entry / exit callbacks, if there is an appropriate transition defined.
 
 Additional features of the FSM library can be enabled by compiling with the
 following defines:
-* `FSM_USE_LOGGING` - enable logging of state transitions via the `logging`
-library.
+* `FSM_USE_LOGGING` - Enables logging of state transitions and other debugging
+information via the `logging` library.
 
 ## Example
 

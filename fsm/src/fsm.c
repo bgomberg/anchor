@@ -42,4 +42,7 @@ void fsm_process_event(fsm_t* fsm, fsm_event_t event) {
             return;
         }
     }
+#ifdef FSM_USE_LOGGING
+    LOG_INFO("Ignoring event with no defined transition (state=%s, event=%s)", impl->state->name, event->name);
+#endif
 }
