@@ -1,6 +1,10 @@
 #include "anchor/fsm/fsm.h"
 
-#ifdef FSM_USE_LOGGING
+#ifndef FSM_USE_LOGGING
+#define FSM_USE_LOGGING 0
+#endif
+
+#if FSM_USE_LOGGING
 #include "anchor/logging/logging.h"
 #endif
 
@@ -22,7 +26,7 @@ void fsm_init(fsm_t* fsm) {
 void fsm_process_event(fsm_t* fsm, fsm_event_t event) {
     fsm_impl_t* impl = (fsm_impl_t*)(fsm->_private);
     if (impl->in_transition) {
-#ifdef FSM_USE_LOGGING
+#if FSM_USE_LOGGING >= 1
         LOG_ERROR("Attempting to process event from handler, dropping event");
 #endif
         return;
@@ -31,7 +35,7 @@ void fsm_process_event(fsm_t* fsm, fsm_event_t event) {
         const fsm_transition_t* transition = &fsm->transitions[i];
         if (impl->state == transition->from_state && event == transition->event) {
             // execute this transition
-#ifdef FSM_USE_LOGGING
+#if FSM_USE_LOGGING >= 1
             LOG_INFO("Executing transition from %s to %s (event=%s)", transition->from_state->name, transition->to_state->name, event->name);
 #endif
             impl->in_transition = true;
@@ -42,7 +46,7 @@ void fsm_process_event(fsm_t* fsm, fsm_event_t event) {
             return;
         }
     }
-#ifdef FSM_USE_LOGGING
+#if FSM_USE_LOGGING >= 2
     LOG_INFO("Ignoring event with no defined transition (state=%s, event=%s)", impl->state->name, event->name);
 #endif
 }
