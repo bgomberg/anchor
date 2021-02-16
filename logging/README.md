@@ -28,6 +28,19 @@ $(BUILD_DIR)/%.o: %.c
 In order to prefix the file name with a module name, define
 `LOGGING_MODULE_NAME` before including `logging.h` in your source file.
 
+### Compile Options
+
+Parameters and additional features of the logging library can be configured
+with the following defines:
+* `LOGGING_MAX_MSG_LENGTH` - The maximum length (128 by default) of a log
+message not including the extra prefixes added by the logging library.
+* `LOGGING_USE_DATETIME` - Prefixes log lines with a full datetime string
+(YYYY-MM-DD HH:MM:SS.SSS) instead of a system uptime (HHH:MM:SS.SSS) and changes
+`time_ms_function` to return a `uint64_t` which should be the number of
+milliseconds since epoch. This defaults to 0.
+
+* LOGGING_USE_DATETIME
+
 ## Example Output
 ```
   0:00:00.626 WARN  system.c:199: Last reset due to software reset

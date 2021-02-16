@@ -20,6 +20,11 @@ extern "C" {
 #define LOGGING_MAX_MSG_LENGTH 128
 #endif
 
+// Define this to prefix logs with datetime instead of system time (changes time_ms_function() to return a uint64_t)
+#ifndef LOGGING_USE_DATETIME
+#define LOGGING_USE_DATETIME 0
+#endif
+
 // The application's build scripts can define FILENAME to the name of the file without the full path in order to save code space
 #ifndef FILENAME
 #define FILENAME __FILE__
@@ -42,8 +47,13 @@ typedef struct {
     void(*raw_write_function)(logging_level_t level, const char* module_name, const char* str);
     // A lock function which is called to make the logging library thread-safe
     void(*lock_function)(bool acquire);
+#if LOGGING_USE_DATETIME
+    // A function which is called to get the number of milliseconds since epoch
+    uint64_t(*time_ms_function)(void);
+#else
     // A function which is called to get the current system time in milliseconds
     uint32_t(*time_ms_function)(void);
+#endif
     // The default logging level
     logging_level_t default_level;
 } logging_init_t;
