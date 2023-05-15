@@ -114,7 +114,7 @@ static void process_line(void) {
             if (!current_token) {
                 if (cmd) {
                     // too much whitespace
-                    write_str("ERROR: Extra whitespace between arguments\n");
+                    write_str("ERROR: Extra whitespace between arguments"CONSOLE_NEWLINE);
                     return;
                 } else {
                     // empty line - silently fail
@@ -142,13 +142,13 @@ static void process_line(void) {
                 if (!cmd) {
                     write_str("ERROR: Command not found (");
                     write_str(current_token);
-                    write_str(")\n");
+                    write_str(")"CONSOLE_NEWLINE);
                     return;
                 }
             } else {
                 // this is an argument
                 if (arg_index == cmd->num_args) {
-                    write_str("ERROR: Too many arguments\n");
+                    write_str("ERROR: Too many arguments"CONSOLE_NEWLINE);
                     return;
                 }
                 // validate the argument
@@ -159,7 +159,7 @@ static void process_line(void) {
                     write_str(arg->name);
                     write_str("' (");
                     write_str(current_token);
-                    write_str(")\n");
+                    write_str(")"CONSOLE_NEWLINE);
                     return;
                 }
                 cmd->args_ptr[arg_index] = parsed_arg.ptr;
@@ -175,7 +175,7 @@ static void process_line(void) {
         // nothing entered - silently fail
         return;
     } else if (arg_index < get_num_required_args(cmd)) {
-        write_str("ERROR: Too few arguments\n");
+        write_str("ERROR: Too few arguments"CONSOLE_NEWLINE);
         return;
     }
 
@@ -291,7 +291,7 @@ static void do_tab_complete(void) {
     } else if (longest_common_prefix == m_line_len) {
         // multiple matches and we've already entered the longest common prefix,
         // so print all the potential matches as a new line
-        write_str("\n");
+        write_str(CONSOLE_NEWLINE);
         for (uint32_t i = 0; i < m_num_commands; i++) {
             const console_command_def_t* cmd_def = &m_commands[i];
             if (strncmp(cmd_def->name, m_line_buffer, m_line_len)) {
@@ -302,7 +302,7 @@ static void do_tab_complete(void) {
             }
             write_str(cmd_def->name);
         }
-        write_str("\n");
+        write_str(CONSOLE_NEWLINE);
         // re-print the prompt and any valid, pending command
         write_str(CONSOLE_PROMPT);
         if (!m_line_invalid) {
@@ -329,12 +329,12 @@ static void help_command_handler(const help_args_t* args) {
         if (!cmd_def) {
             write_str("ERROR: Unknown command (");
             write_str(args->command);
-            write_str(")\n");
+            write_str(")"CONSOLE_NEWLINE);
             return;
         }
         if (cmd_def->desc) {
             write_str(cmd_def->desc);
-            write_str("\n");
+            write_str(CONSOLE_NEWLINE);
         }
         write_str("Usage: ");
         write_str(args->command);
@@ -355,7 +355,7 @@ static void help_command_handler(const help_args_t* args) {
                 write_str("]");
             }
         }
-        write_str("\n");
+        write_str(CONSOLE_NEWLINE);
         for (uint32_t i = 0; i < cmd_def->num_args; i++) {
             const console_arg_def_t* arg_def = &cmd_def->args[i];
             write_str("  ");
@@ -369,10 +369,10 @@ static void help_command_handler(const help_args_t* args) {
                 write_str(" - ");
                 write_str(arg_def->desc);
             }
-            write_str("\n");
+            write_str(CONSOLE_NEWLINE);
         }
     } else {
-        write_str("Available commands:\n");
+        write_str("Available commands:"CONSOLE_NEWLINE);
         // get the max name length for padding
         uint32_t max_name_len = 0;
         for (uint32_t i = 0; i < m_num_commands; i++) {
@@ -395,7 +395,7 @@ static void help_command_handler(const help_args_t* args) {
                 write_str(" - ");
                 write_str(cmd_def->desc);
             }
-            write_str("\n");
+            write_str(CONSOLE_NEWLINE);
         }
     }
 }
@@ -406,7 +406,7 @@ void console_init(const console_init_t* init) {
 #if CONSOLE_HELP_COMMAND
     console_command_register(help);
 #endif
-    write_str("\n" CONSOLE_PROMPT);
+    write_str(CONSOLE_NEWLINE CONSOLE_PROMPT);
 }
 
 bool console_command_register(const console_command_def_t* cmd) {
@@ -493,12 +493,12 @@ void console_process(const uint8_t* data, uint32_t length) {
 #endif
             continue;
         }
-        if (c == '\n') {
+        if (c == CONSOLE_RETURN_KEY) {
             if (echo_str) {
                 write_str(echo_str);
                 echo_str = NULL;
             }
-            write_str("\n");
+            write_str(CONSOLE_NEWLINE);
             process_line();
             reset_line_and_print_prompt();
         } else if (c == CHAR_CTRL_C) {
@@ -506,7 +506,7 @@ void console_process(const uint8_t* data, uint32_t length) {
                 write_str(echo_str);
                 echo_str = NULL;
             }
-            write_str("\n");
+            write_str(CONSOLE_NEWLINE);
             reset_line_and_print_prompt();
             echo_str = NULL;
         } else if (!m_line_invalid && c == '\b') {
@@ -567,7 +567,7 @@ void console_process(const uint8_t* data, uint32_t length) {
 #else
     for (uint32_t i = 0; i < length; i++) {
         const char c = data[i];
-        if (c == '\n') {
+        if (c == CONSOLE_RETURN_KEY) {
             process_line();
             reset_line_and_print_prompt();
         } else if (!m_line_invalid && c >= ' ' && c <= '~') {

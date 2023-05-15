@@ -14,6 +14,14 @@
 #define CONSOLE_PROMPT "> "
 #endif
 
+#ifndef CONSOLE_RETURN_KEY
+#define CONSOLE_RETURN_KEY '\r'
+#endif
+
+#ifndef CONSOLE_NEWLINE
+#define CONSOLE_NEWLINE "\r\n"
+#endif
+
 #ifndef CONSOLE_BUFFER_ATTRIBUTES
 #define CONSOLE_BUFFER_ATTRIBUTES
 #endif
