@@ -73,7 +73,7 @@ typedef struct {
 
 // Change the logging threshold for the current module
 
-#define LOG_SET_LEVEL(LEVEL) _logging_logger->level = LEVEL
+#define LOG_SET_LEVEL(LEVEL) _logging_logger.level = LEVEL
 
 // Macros for logging at each level
 #define LOG_DEBUG(...) _LOG_LEVEL_IMPL(LOGGING_LEVEL_DEBUG, __VA_ARGS__)
