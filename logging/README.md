@@ -14,13 +14,13 @@ the level of each module can be changed using the `LOG_SET_LEVEL(...)` macro.
 
 ### Shorter File Names
 
-By default, the logging library will use the `__FILE__` define provided by gcc
-to get the name of the file. To reduce code size, and make the logs easier to
-read, it's recommended to generate a `FILENAME` define at compile time for each
-source file. An example Make rule which does this is shown below:
+The logging library will use the `__FILE__` define provided by gcc to get the
+name of the file. To reduce code size, and make the logs easier to read, it's
+recommended to use the `-fmacro-prefix-map={DIRECTORY}=` GCC option.
+An example Make rule which does this is shown below:
 ```
 $(BUILD_DIR)/%.o: %.c
-	@$(CC) -c -DFILENAME=\"$(notdir $<)\" $(CFLAGS) $< -o $@
+	@$(CC) -c -fmacro-prefix-map=$(dir $<)/= $(CFLAGS) $< -o $@
 ```
 
 ### Module Prefix
@@ -37,14 +37,15 @@ In order to set a default logging level at compile time, define
 
 Parameters and additional features of the logging library can be configured
 with the following defines:
+* `LOGGING_CUSTOM_HANDLER` - Allows for specifying a custom log handler, which
+bypasses any formatting done by logging library.
 * `LOGGING_MAX_MSG_LENGTH` - The maximum length (128 by default) of a log
-message not including the extra prefixes added by the logging library.
+message not including the extra prefixes added by the logging library. This
+setting is not used if LOGGING_CUSTOM_HANDLER is set.
 * `LOGGING_USE_DATETIME` - Prefixes log lines with a full datetime string
-(YYYY-MM-DD HH:MM:SS.SSS) instead of a system uptime (HHH:MM:SS.SSS) and changes
-`time_ms_function` to return a `uint64_t` which should be the number of
+(YYYY-MM-DD HH:MM:SS.SSS) instead of a system uptime (HHH:MM:SS.SSS) and
+changes `time_ms_function` to return a `uint64_t` which should be the number of
 milliseconds since epoch. This defaults to 0.
-
-* LOGGING_USE_DATETIME
 
 ## Example Output
 ```

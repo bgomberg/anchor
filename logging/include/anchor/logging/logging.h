@@ -1,5 +1,8 @@
 // We explicitly don't use include guards as this file should not be included recursively.
 
+// NOTE: LOGGING_MODULE_NAME can be defined before including this header in order to specify the module
+// NOTE: LOGGING_FILE_DEFAULT_LEVEL can be defined before including this header in order to change the default log level
+
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -8,30 +11,33 @@
 extern "C" {
 #endif
 
-#ifdef _MSC_VER
-#define _LOGGING_FORMAT_ATTR
-#define _LOGGING_USED_ATTR
-#else
-#define _LOGGING_FORMAT_ATTR __attribute__((format(printf, 5, 6)))
-#define _LOGGING_USED_ATTR __attribute__((used))
-#endif
-
-// The maximum length of a log message (not including extra formatting)
+// The maximum length of a log message (not including extra formatting - not used if LOGGING_CUSTOM_HANDLER is set)
 #ifndef LOGGING_MAX_MSG_LENGTH
-#define LOGGING_MAX_MSG_LENGTH 128
+#define LOGGING_MAX_MSG_LENGTH  128
 #endif
 
-// Define this to prefix logs with datetime instead of system time (changes time_ms_function() to return a uint64_t)
+// Define this to prefix logs with datetime instead of system time (also changes logging_timestamp_t to a uint64_t)
 #ifndef LOGGING_USE_DATETIME
-#define LOGGING_USE_DATETIME 0
+#define LOGGING_USE_DATETIME    0
 #endif
 
-// The application's build scripts can define FILENAME to the name of the file without the full path in order to save code space
-#ifndef FILENAME
-#define FILENAME __FILE__
+// Define this in order to replace the logging library's handler - this is useful to implement custom formatters
+#ifndef LOGGING_CUSTOM_HANDLER
+#define LOGGING_CUSTOM_HANDLER  0
 #endif
 
-// NOTE: LOGGING_MODULE_NAME can be defined before including this header in order to specify the module which the file belongs to
+#if LOGGING_USE_DATETIME
+#define LOGGING_TIMESTAMP_FMT_STR "%04u-%02u-%02u %02u:%02u:%02u.%03u"
+#define LOGGING_TIMESTAMP_FMT_ARGS(COMPONENTS) \
+    (COMPONENTS).year, (COMPONENTS).month, (COMPONENTS).day, \
+    (COMPONENTS).hour, (COMPONENTS).minute, (COMPONENTS).second, (COMPONENTS).ms
+typedef uint64_t logging_timestamp_t;
+#else
+#define LOGGING_TIMESTAMP_FMT_STR "%3u:%02u:%02u.%03u"
+#define LOGGING_TIMESTAMP_FMT_ARGS(COMPONENTS) \
+    (COMPONENTS).hour, (COMPONENTS).minute, (COMPONENTS).second, (COMPONENTS).ms
+typedef uint32_t logging_timestamp_t;
+#endif
 
 typedef enum {
     LOGGING_LEVEL_DEFAULT = 0, // Used to represent the default level specified to logging_init()
@@ -42,19 +48,41 @@ typedef enum {
 } logging_level_t;
 
 typedef struct {
+#if LOGGING_USE_DATETIME
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+#endif
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+    uint16_t ms;
+} logging_timestamp_components_t;
+
+typedef struct {
+    logging_level_t level;
+    const char* file;
+    int line;
+    const char* module_prefix;
+    logging_timestamp_t timestamp;
+    logging_timestamp_components_t timestamp_components;
+    const char* fmt;
+    va_list args;
+} logging_line_t;
+
+typedef struct {
+#if LOGGING_CUSTOM_HANDLER
+    // Handler function
+    void(*handler)(const logging_line_t* log_line);
+#else
     // Write function which gets passed a fully-formatted log line
     void(*write_function)(const char* str);
-    // Write function which gets passed the level and module name split out in addition to the fully-formatted log line
-    void(*raw_write_function)(logging_level_t level, const char* module_name, const char* str);
     // A lock function which is called to make the logging library thread-safe
     void(*lock_function)(bool acquire);
-#if LOGGING_USE_DATETIME
-    // A function which is called to get the number of milliseconds since epoch
-    uint64_t(*time_ms_function)(void);
-#else
-    // A function which is called to get the current system time in milliseconds
-    uint32_t(*time_ms_function)(void);
 #endif
+    // A function which is called to get the current timestamp in milliseconds (either an epoch time or system uptime)
+    // NOTE: This is not called while handling the lock_function() so much be implicitly thread-safe
+    logging_timestamp_t(*time_ms_function)(void);
     // The default logging level
     logging_level_t default_level;
 } logging_init_t;
@@ -65,41 +93,20 @@ bool logging_init(const logging_init_t* init);
 // Logs a line which was manually captured through a printf-style function hook / macro (filtered by the default level)
 void logging_log_line(logging_level_t level, const char* file, int line, const char* module_prefix, const char* fmt, va_list args);
 
-// Internal type used to represent a logger (should not be directly modified)
-typedef struct {
-    logging_level_t level;
-    const char* const module_prefix;
-} logging_logger_t;
+// Formats a log line into the specified buffer
+void logging_format_line(const logging_line_t* log_line, char* buffer, uint32_t size);
+
+// Need to include this after our types or defined
+#include "logging_internal.h"
 
 // Change the logging threshold for the current module
-
-#define LOG_SET_LEVEL(LEVEL) _logging_logger->level = LEVEL
+#define LOG_SET_LEVEL(LEVEL) _logging_logger.level = LEVEL
 
 // Macros for logging at each level
 #define LOG_DEBUG(...) _LOG_LEVEL_IMPL(LOGGING_LEVEL_DEBUG, __VA_ARGS__)
 #define LOG_INFO(...) _LOG_LEVEL_IMPL(LOGGING_LEVEL_INFO, __VA_ARGS__)
 #define LOG_WARN(...) _LOG_LEVEL_IMPL(LOGGING_LEVEL_WARN, __VA_ARGS__)
 #define LOG_ERROR(...) _LOG_LEVEL_IMPL(LOGGING_LEVEL_ERROR, __VA_ARGS__)
-
-// Internal implementation macros / functions which are called via the macros above
-#define _LOG_LEVEL_IMPL(LEVEL, ...) logging_log_impl(&_logging_logger, LEVEL, FILENAME, __LINE__, __VA_ARGS__)
-void logging_log_impl(logging_logger_t* logger, logging_level_t level, const char* file, int line, const char* fmt, ...) _LOGGING_FORMAT_ATTR;
-
-// Per-file context object which we should create
-static logging_logger_t _logging_logger _LOGGING_USED_ATTR = {
-#ifdef LOGGING_FILE_DEFAULT_LEVEL
-    .level = LOGGING_FILE_DEFAULT_LEVEL,
-#undef LOGGING_FILE_DEFAULT_LEVEL
-#else
-    .level = LOGGING_LEVEL_DEFAULT,
-#endif
-#ifdef LOGGING_MODULE_NAME
-    .module_prefix = LOGGING_MODULE_NAME ":",
-#undef LOGGING_MODULE_NAME
-#else
-    .module_prefix = 0,
-#endif
-};
 
 #ifdef __cplusplus
 }
