@@ -72,6 +72,10 @@ registered (default of 16).
 console library (default of 128).
 * `CONSOLE_PROMPT` - The string displayed to prompt for console input (default
 of "> ").
+* `CONSOLE_RETURN_KEY` - Specifies the character sequence for the console
+return key (default is '\n').
+* `CONSOLE_NEWLINE` - Defines the character sequence for console newline
+(default is '\n').
 * `CONSOLE_BUFFER_ATTRIBUTES` - Extra GCC attributes to add to the internal
 buffers used by the console library (default of none). As an example, this can
 be used in cases where these buffers should be placed in a different linker

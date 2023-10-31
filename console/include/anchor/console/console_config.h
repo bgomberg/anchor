@@ -15,11 +15,11 @@
 #endif
 
 #ifndef CONSOLE_RETURN_KEY
-#define CONSOLE_RETURN_KEY '\r'
+#define CONSOLE_RETURN_KEY '\n'
 #endif
 
 #ifndef CONSOLE_NEWLINE
-#define CONSOLE_NEWLINE "\r\n"
+#define CONSOLE_NEWLINE "\n"
 #endif
 
 #ifndef CONSOLE_BUFFER_ATTRIBUTES
