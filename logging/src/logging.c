@@ -13,19 +13,19 @@
 #define FILE_NAME_LENGTH        32
 #define FULL_LOG_MAX_LENGTH     (LOGGING_MAX_MSG_LENGTH + LEVEL_PREFIX_LENGTH + TIME_LENGTH + FILE_NAME_LENGTH + 1)
 
-#if LOGGING_USE_DATETIME
-typedef struct {
-    uint16_t year;
-    uint8_t month;
-    uint8_t day;
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t second;
-    uint16_t ms;
-} datetime_t;
-#endif
+#define BUFFER_PRINTF(BUFFER, SIZE, FMT, ...) ({ \
+        const uint32_t _len = strlen(BUFFER); \
+        snprintf(&BUFFER[_len], (SIZE)-_len, FMT, __VA_ARGS__); \
+    })
 
-static const char* LEVEL_PREFIX[] = {
+#define BUFFER_VA_PRINTF(BUFFER, SIZE, FMT, ARGS) ({ \
+        const uint32_t _len = strlen(BUFFER); \
+        vsnprintf(&BUFFER[_len], (SIZE)-_len, FMT, ARGS); \
+    })
+
+#define BUFFER_WRITE(BUFFER, SIZE, STR) BUFFER_PRINTF(BUFFER, SIZE, "%s", STR)
+
+static const char* const LEVEL_PREFIX[] = {
     [LOGGING_LEVEL_DEFAULT] =   "????? ", // should never be printed
     [LOGGING_LEVEL_DEBUG] =     "DEBUG ",
     [LOGGING_LEVEL_INFO] =      "INFO  ",
@@ -37,35 +37,39 @@ static const uint8_t DAYS_PER_MONTH[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31,
 #endif
 
 static logging_init_t m_init;
-static char m_write_buffer[FULL_LOG_MAX_LENGTH];
 
 #if LOGGING_USE_DATETIME
 static bool is_leap_year(uint16_t year) {
     // A year is a leap year if it's evenly divisible by 4 unless it's evenly divisible by 100 but not 400.
     return ((year & 3) == 0 && (year % 100)) || (year % 400) == 0;
 }
+#endif
 
-static void timestamp_to_datetime(uint64_t ms, datetime_t* datetime) {
-    uint32_t seconds = ms / 1000;
+static void get_timestamp_components(logging_timestamp_t timestamp, logging_timestamp_components_t* components) {
+#if LOGGING_USE_DATETIME
+    logging_timestamp_t seconds_timestamp = timestamp % 86400000;
+#else
+    logging_timestamp_t seconds_timestamp = timestamp;
+#endif
+    components->ms = seconds_timestamp % 1000;
+    seconds_timestamp /= 1000;
+    components->second = seconds_timestamp % 60;
+    seconds_timestamp /= 60;
+    components->minute = seconds_timestamp % 60;
+    seconds_timestamp /= 60;
+    components->hour = seconds_timestamp;
 
+#if LOGGING_USE_DATETIME
     // Calculate days since epoch (add 1 for the current day)
-    uint32_t days = seconds / 86400 + 1;
-    seconds = seconds % 86400;
-
-    // Calculate the hour, minute, seconds of the datetime
-    datetime->hour = (uint8_t)(seconds / 3600);
-    seconds = seconds % 3600;
-    datetime->minute = (uint8_t)(seconds / 60);
-    datetime->second = (uint8_t)(seconds % 60);
-    datetime->ms = ms % 1000;
+    uint32_t days = timestamp / 86400000 + 1;
 
     // Calculate the year
     uint16_t days_in_year = 365;
-    datetime->year = 1970;
+    components->year = 1970;
     while (days > days_in_year) {
         days -= days_in_year;
-        datetime->year++;
-        if (is_leap_year(datetime->year)) {
+        components->year++;
+        if (is_leap_year(components->year)) {
             // this is a leap year
             days_in_year = 366;
         } else {
@@ -74,83 +78,66 @@ static void timestamp_to_datetime(uint64_t ms, datetime_t* datetime) {
     }
 
     // Calculate the month and day
-    datetime->month = 0;
+    components->month = 0;
     for (uint8_t month = 1; month <= 12; month++) {
-        const uint8_t days_in_month = (month == 2 && is_leap_year(datetime->year)) ? 29 : DAYS_PER_MONTH[month-1];
+        const uint8_t days_in_month = (month == 2 && is_leap_year(components->year)) ? 29 : DAYS_PER_MONTH[month-1];
         if (days <= days_in_month) {
-            datetime->month = month;
+            components->month = month;
             break;
         } else {
             days -= days_in_month;
         }
     }
-    datetime->day = days;
-}
+    components->day = days;
 #endif
+}
 
-static void log_line_helper(logging_level_t level, const char* file, int line, const char* module_prefix, const char* fmt, va_list args) {
+#if !LOGGING_CUSTOM_HANDLER
+static void handle_log_line(const logging_line_t* log_line) {
     if (m_init.lock_function) {
         m_init.lock_function(true);
     }
-    m_write_buffer[0] = '\0';
-
-    // time
-    if (m_init.time_ms_function) {
-#if LOGGING_USE_DATETIME
-        uint64_t current_time = m_init.time_ms_function();
-        datetime_t datetime;
-        timestamp_to_datetime(current_time, &datetime);
-        snprintf(m_write_buffer, FULL_LOG_MAX_LENGTH, "%04u-%02u-%02u %02u:%02u:%02u.%03u ", datetime.year, datetime.month,
-            datetime.day, datetime.hour, datetime.minute, datetime.second, datetime.ms);
-#else
-        uint32_t current_time = m_init.time_ms_function();
-        const uint16_t ms = current_time % 1000;
-        current_time /= 1000;
-        const uint16_t sec = current_time % 60;
-        current_time /= 60;
-        const uint16_t min = current_time % 60;
-        current_time /= 60;
-        const uint16_t hours = current_time;
-        snprintf(m_write_buffer, FULL_LOG_MAX_LENGTH, "%3u:%02u:%02u.%03u ", hours, min, sec, ms);
-#endif
-    }
-
-    // level
-    snprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), "%s", LEVEL_PREFIX[level]);
-
-    // module (if set)
-    if (module_prefix) {
-        snprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), "%s", module_prefix);
-    }
-
-    // file name
-    snprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), "%s", file);
-
-    // line number
-    snprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), ":%d: ", line);
-
-    // log message
-    vsnprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), fmt, args);
-
-    // newline
-    snprintf(&m_write_buffer[strlen(m_write_buffer)], FULL_LOG_MAX_LENGTH-strlen(m_write_buffer), "\n");
-
-    if (m_init.write_function) {
-        m_init.write_function(m_write_buffer);
-    }
-    if (m_init.raw_write_function) {
-        m_init.raw_write_function(level, module_prefix, m_write_buffer);
-    }
-
+    static char buffer[FULL_LOG_MAX_LENGTH];
+    logging_format_line(log_line, buffer, sizeof(buffer));
+    m_init.write_function(buffer);
     if (m_init.lock_function) {
         m_init.lock_function(false);
     }
 }
+#endif
+
+static void log_line_helper(logging_level_t level, const char* file, int line, const char* module_prefix, const char* fmt, va_list args) {
+    logging_line_t log_line = {
+        .level = level,
+        .file = file,
+        .line = line,
+        .module_prefix = module_prefix,
+        .timestamp = m_init.time_ms_function ? m_init.time_ms_function() : 0,
+        .fmt = fmt,
+        .args = args,
+    };
+    get_timestamp_components(log_line.timestamp, &log_line.timestamp_components);
+
+#if LOGGING_CUSTOM_HANDLER
+    m_init.handler(&log_line);
+#else
+    handle_log_line(&log_line);
+#endif
+}
 
 bool logging_init(const logging_init_t* init) {
-    if ((!init->write_function && !init->raw_write_function) || init->default_level == LOGGING_LEVEL_DEFAULT) {
+    if (init->default_level == LOGGING_LEVEL_DEFAULT) {
         return false;
     }
+#if LOGGING_CUSTOM_HANDLER
+    if (!init->handler) {
+        return false;
+    }
+#else
+    if (!init->write_function) {
+        return false;
+    }
+#endif
     m_init = *init;
     return true;
 }
@@ -171,4 +158,39 @@ void logging_log_impl(logging_logger_t* logger, logging_level_t level, const cha
     va_start(args, fmt);
     log_line_helper(level, file, line, logger->module_prefix, fmt, args);
     va_end(args);
+}
+
+void logging_format_line(const logging_line_t* log_line, char* buffer, uint32_t size) {
+    buffer[0] = '\0';
+
+    // Add the timestamp
+    if (m_init.time_ms_function || log_line->timestamp) {
+        logging_timestamp_components_t timestamp_components;
+        get_timestamp_components(log_line->timestamp, &timestamp_components);
+        BUFFER_PRINTF(buffer, size, LOGGING_TIMESTAMP_FMT_STR " ", LOGGING_TIMESTAMP_FMT_ARGS(timestamp_components));
+    }
+
+    // Add the level
+    BUFFER_WRITE(buffer, size, LEVEL_PREFIX[log_line->level]);
+
+    // Add the module (if set)
+    if (log_line->module_prefix) {
+        BUFFER_WRITE(buffer, size, log_line->module_prefix);
+    }
+
+    // Add the file name
+    BUFFER_WRITE(buffer, size, log_line->file);
+
+    // Add the line number
+    BUFFER_PRINTF(buffer, size, ":%d: ", log_line->line);
+
+    // Add the formatted log message
+    BUFFER_VA_PRINTF(buffer, size, log_line->fmt, log_line->args);
+
+    // Always add a newline, even if it means truncating the message
+    if (strlen(buffer) == size - 1) {
+        // Need to make space for the newline
+        buffer[size-2] = '\0';
+    }
+    BUFFER_WRITE(buffer, size, "\n");
 }
