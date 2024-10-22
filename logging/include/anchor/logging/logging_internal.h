@@ -19,8 +19,9 @@ typedef struct {
 } logging_logger_t;
 
 // Internal implementation macros / functions which are called via the LOG_* macros
-#define _LOG_LEVEL_IMPL(LEVEL, ...) logging_log_impl(&_logging_logger, LEVEL, __FILE__, __LINE__, __VA_ARGS__)
-void logging_log_impl(logging_logger_t* logger, logging_level_t level, const char* file, int line, const char* fmt, ...) _LOGGING_FORMAT_ATTR;
+#define _LOG_LEVEL_IMPL(LEVEL, ...) if (logging_level_is_active(&_logging_logger, LEVEL)) logging_log_impl(LEVEL, __FILE__, __LINE__, _logging_logger.module_prefix, __VA_ARGS__)
+bool logging_level_is_active(logging_logger_t* logger, logging_level_t level);
+void logging_log_impl(logging_level_t level, const char* file, int line, const char* module_prefix, const char* fmt, ...) _LOGGING_FORMAT_ATTR;
 
 #ifdef LOGGING_MODULE_NAME
 #define _LOGGING_MODULE_PREFIX LOGGING_MODULE_NAME ":"

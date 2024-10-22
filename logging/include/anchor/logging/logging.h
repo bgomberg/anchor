@@ -99,6 +99,9 @@ void logging_format_line(const logging_line_t* log_line, char* buffer, uint32_t 
 // Need to include this after our types or defined
 #include "logging_internal.h"
 
+// Returns whether a given level is active
+#define LOG_LEVEL_IS_ACTIVE(LEVEL) logging_level_is_active(&_logging_logger, LEVEL)
+
 // Change the logging threshold for the current module
 #define LOG_SET_LEVEL(LEVEL) _logging_logger.level = LEVEL
 

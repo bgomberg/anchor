@@ -149,14 +149,15 @@ void logging_log_line(logging_level_t level, const char* file, int line, const c
     log_line_helper(level, file, line, module_prefix, fmt, args);
 }
 
-void logging_log_impl(logging_logger_t* logger, logging_level_t level, const char* file, int line, const char* fmt, ...) {
+bool logging_level_is_active(logging_logger_t* logger, logging_level_t level) {
     const logging_level_t min_level = logger->level == LOGGING_LEVEL_DEFAULT ? m_init.default_level : logger->level;
-    if (level < min_level) {
-        return;
-    }
+    return level >= min_level;
+}
+
+void logging_log_impl(logging_level_t level, const char* file, int line, const char* module_prefix, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_line_helper(level, file, line, logger->module_prefix, fmt, args);
+    log_line_helper(level, file, line, module_prefix, fmt, args);
     va_end(args);
 }
 
