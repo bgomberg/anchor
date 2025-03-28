@@ -469,7 +469,6 @@ static void help_command_handler(const help_args_t* args) {
 
 void console_init(const console_init_t* init) {
     m_init = *init;
-
 #if CONSOLE_HELP_COMMAND
     console_command_register(help);
 #endif
