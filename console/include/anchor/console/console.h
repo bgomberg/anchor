@@ -112,6 +112,9 @@ typedef struct {
 // Initializes the console library
 void console_init(const console_init_t* init);
 
+// Deinitializes the console library
+void console_deinit(void);
+
 // Registers a console command with the console library (returns true on success)
 bool console_command_register(const console_command_def_t* cmd);
 
