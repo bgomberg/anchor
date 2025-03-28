@@ -470,14 +470,16 @@ static void help_command_handler(const help_args_t* args) {
 void console_init(const console_init_t* init) {
     m_init = *init;
 
-    // make sure to deregister previous commands
-    m_num_commands = 0;
-    memset(m_commands, 0, sizeof(m_commands) / sizeof(m_commands[0]));
-
 #if CONSOLE_HELP_COMMAND
     console_command_register(help);
 #endif
     write_str(CONSOLE_NEWLINE CONSOLE_PROMPT);
+}
+
+void console_deinit(void) {
+    // deregister commands
+    m_num_commands = 0;
+    memset(m_commands, 0, sizeof(m_commands) / sizeof(m_commands[0]));
 }
 
 bool console_command_register(const console_command_def_t* cmd) {

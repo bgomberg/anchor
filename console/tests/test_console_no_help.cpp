@@ -256,17 +256,3 @@ TEST(ConsoleTest, TestPrintLine) {
   process_line("hi\n");
   EXPECT_WRITE_BUFFER("hi\nhi\n> ");
 }
-
-TEST(ConsoleTest, TestInitClearsPreviousCommands) {
-  // try to register an existing command, should fail
-  EXPECT_FALSE(console_command_register(say_hi));
-
-  // re-init, just use dummy init for now
-  const console_init_t init_console = {
-    .write_function = NULL,
-  };
-  console_init(&init_console);
-
-  // try to register same command, should succeed now
-  EXPECT_TRUE(console_command_register(say_hi));
-}
