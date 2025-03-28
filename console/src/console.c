@@ -478,7 +478,7 @@ void console_init(const console_init_t* init) {
 void console_deinit(void) {
     // deregister commands
     m_num_commands = 0;
-    memset(m_commands, 0, sizeof(m_commands) / sizeof(m_commands[0]));
+    memset(m_commands, 0, sizeof(m_commands));
 }
 
 bool console_command_register(const console_command_def_t* cmd) {
