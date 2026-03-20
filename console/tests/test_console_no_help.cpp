@@ -256,3 +256,60 @@ TEST(ConsoleTest, TestPrintLine) {
   process_line("hi\n");
   EXPECT_WRITE_BUFFER("hi\nhi\n> ");
 }
+
+TEST(ConsoleTest, TestMaxLineLengthBufferFull) {
+  // Send exactly CONSOLE_MAX_LINE_LENGTH printable characters. The buffer
+  // can only hold MAX-1 characters + null terminator, so the last character
+  // must be rejected.
+  char input[CONSOLE_MAX_LINE_LENGTH + 1];
+  memset(input, 'A', CONSOLE_MAX_LINE_LENGTH);
+  input[CONSOLE_MAX_LINE_LENGTH] = '\0';
+
+  char expected_echo[CONSOLE_MAX_LINE_LENGTH];
+  memset(expected_echo, 'A', CONSOLE_MAX_LINE_LENGTH - 1);
+  expected_echo[CONSOLE_MAX_LINE_LENGTH - 1] = '\0';
+
+  process_line(input);
+  EXPECT_WRITE_BUFFER(expected_echo);
+
+  process_line("\n");
+  EXPECT_WRITE_BUFFER("\n> ");
+
+  process_line("say_hi\n");
+  EXPECT_WRITE_BUFFER(
+    "say_hi\n"
+    "hi\n> ");
+}
+
+TEST(ConsoleTest, TestInsertMiddleOutsideOfSafeBoundary) {
+  // Fill the buffer to two characters short of the max, move cursor back,
+  // then insert via the memmove path to reach max-1 (safe boundary).
+  // Finally append one more character at the end (no memmove) — with the
+  // fix this character should be rejected.
+  char input[CONSOLE_MAX_LINE_LENGTH - 1];
+  memset(input, 'B', CONSOLE_MAX_LINE_LENGTH - 2);
+  input[CONSOLE_MAX_LINE_LENGTH - 2] = '\0';
+
+  process_line(input);
+  g_console_write_buffer.clear();
+
+  process_line(LEFT_ARROW_SEQUENCE);
+  g_console_write_buffer.clear();
+
+  process_line("X");
+  g_console_write_buffer.clear();
+
+  process_line(RIGHT_ARROW_SEQUENCE);
+  g_console_write_buffer.clear();
+
+  process_line("Z");
+  EXPECT_WRITE_BUFFER("");
+
+  process_line("\n");
+  EXPECT_WRITE_BUFFER("\n> ");
+
+  process_line("say_hi\n");
+  EXPECT_WRITE_BUFFER(
+    "say_hi\n"
+    "hi\n> ");
+}
