@@ -258,9 +258,6 @@ TEST(ConsoleTest, TestPrintLine) {
 }
 
 TEST(ConsoleTest, TestMaxLineLengthBufferFull) {
-  // Send exactly CONSOLE_MAX_LINE_LENGTH printable characters. The buffer
-  // can only hold MAX-1 characters + null terminator, so the last character
-  // must be rejected.
   char input[CONSOLE_MAX_LINE_LENGTH + 1];
   memset(input, 'A', CONSOLE_MAX_LINE_LENGTH);
   input[CONSOLE_MAX_LINE_LENGTH] = '\0';
@@ -282,10 +279,6 @@ TEST(ConsoleTest, TestMaxLineLengthBufferFull) {
 }
 
 TEST(ConsoleTest, TestInsertMiddleOutsideOfSafeBoundary) {
-  // Fill the buffer to two characters short of the max, move cursor back,
-  // then insert via the memmove path to reach max-1 (safe boundary).
-  // Finally append one more character at the end (no memmove) — with the
-  // fix this character should be rejected.
   char input[CONSOLE_MAX_LINE_LENGTH - 1];
   memset(input, 'B', CONSOLE_MAX_LINE_LENGTH - 2);
   input[CONSOLE_MAX_LINE_LENGTH - 2] = '\0';
