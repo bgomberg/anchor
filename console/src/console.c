@@ -256,6 +256,11 @@ static void reset_line_and_print_prompt(void) {
 }
 
 static void push_char(char c) {
+    if (m_line_len + 1 >= CONSOLE_MAX_LINE_LENGTH) {
+        // no room for the character + null terminator
+        m_line_invalid = true;
+        return;
+    }
     if (m_cursor_pos != m_line_len) {
         // shift the existing data to the right to make space
         memmove(&m_line_buffer[m_cursor_pos + 1], &m_line_buffer[m_cursor_pos], m_line_len - m_cursor_pos);
@@ -264,10 +269,6 @@ static void push_char(char c) {
     m_cursor_pos++;
     m_line_len++;
     m_line_buffer[m_line_len] = '\0';
-    if (m_line_len == CONSOLE_MAX_LINE_LENGTH) {
-        // filled up the line buffer, so mark the line invalid
-        m_line_invalid = true;
-    }
 }
 
 #if CONSOLE_FULL_CONTROL
