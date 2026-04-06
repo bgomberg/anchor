@@ -22,16 +22,40 @@ static void process_line(const char* str) {
 }
 
 #if CONSOLE_HELP_COMMAND
+TEST(ConsoleTest, TestHelpMultiOptionalArgs) {
+  process_line("help multi_add\n");
+  EXPECT_WRITE_BUFFER(
+    "help multi_add\n"
+    "Add numbers with multiple optional args\n"
+    "Usage: multi_add num1 [num2] [num3]\n"
+    "  num1 - First number\n"
+    "  num2 - Second (optional) number\n"
+    "  num3 - Third (optional) number\n"
+    "> ");
+
+  process_line("help greet\n");
+  EXPECT_WRITE_BUFFER(
+    "help greet\n"
+    "Greet with optional name and title\n"
+    "Usage: greet greeting [name] [title]\n"
+    "  greeting - The greeting word\n"
+    "  name     - Name to greet\n"
+    "  title    - Title prefix\n"
+    "> ");
+}
+
 TEST(ConsoleTest, TestHelpCommand) {
   process_line("help\n");
   EXPECT_WRITE_BUFFER("help\n"
     "Available commands:\n"
-    "  help    - List all commands, or give details about a specific command\n"
-    "  say_hi  - Says hi\n"
-    "  say_bye - Says bye\n"
+    "  help      - List all commands, or give details about a specific command\n"
+    "  say_hi    - Says hi\n"
+    "  say_bye   - Says bye\n"
     "  minimal\n"
-    "  add     - Add two numbers\n"
-    "  stroff  - Prints a string starting from an offset\n"
+    "  add       - Add two numbers\n"
+    "  stroff    - Prints a string starting from an offset\n"
+    "  multi_add - Add numbers with multiple optional args\n"
+    "  greet     - Greet with optional name and title\n"
     "> ");
 
   process_line("help add\n");

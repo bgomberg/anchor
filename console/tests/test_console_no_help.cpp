@@ -195,6 +195,69 @@ TEST(ConsoleTest, TestHelpCommand) {
 }
 #endif
 
+TEST(ConsoleTest, TestValidMultiAddCommand) {
+  process_line("multi_add 1 2 3\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add 1 2 3\n"
+    "1 + 2 + 3 = 6\n> ");
+
+  process_line("multi_add 5 10\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add 5 10\n"
+    "5 + 10 = 15\n> ");
+
+  process_line("multi_add 42\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add 42\n"
+    "42\n> ");
+}
+
+TEST(ConsoleTest, TestInvalidMultiAddCommand) {
+  process_line("multi_add\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add\n"
+    "ERROR: Too few arguments\n> ");
+
+  process_line("multi_add 1 2 3 4\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add 1 2 3 4\n"
+    "ERROR: Too many arguments\n> ");
+
+  process_line("multi_add abc\n");
+  EXPECT_WRITE_BUFFER(
+    "multi_add abc\n"
+    "ERROR: Invalid value for 'num1' (abc)\n> ");
+}
+
+TEST(ConsoleTest, TestValidGreetCommand) {
+  process_line("greet hello Alice Dr\n");
+  EXPECT_WRITE_BUFFER(
+    "greet hello Alice Dr\n"
+    "hello Dr Alice\n> ");
+
+  process_line("greet hi Bob\n");
+  EXPECT_WRITE_BUFFER(
+    "greet hi Bob\n"
+    "hi Bob\n> ");
+
+  process_line("greet howdy\n");
+  EXPECT_WRITE_BUFFER(
+    "greet howdy\n"
+    "howdy\n> ");
+}
+
+TEST(ConsoleTest, TestInvalidGreetCommand) {
+  process_line("greet\n");
+  EXPECT_WRITE_BUFFER(
+    "greet\n"
+    "ERROR: Too few arguments\n> ");
+
+  process_line("greet hello Alice Dr Extra\n");
+  EXPECT_WRITE_BUFFER(
+    "greet hello Alice Dr Extra\n"
+    "ERROR: Too many arguments\n> ");
+}
+
 TEST(ConsoleTest, TestTabComplete) {
   process_line("sa\t");
   EXPECT_WRITE_BUFFER("say_");
