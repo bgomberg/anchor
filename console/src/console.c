@@ -115,7 +115,7 @@ static uint32_t get_num_required_args(const console_command_def_t* cmd) {
     for (uint32_t i = 0; i < cmd->num_args; i++) {
         const console_arg_def_t* arg = &cmd->args[i];
         if (!arg->is_optional) {
-            continue:
+            continue;
         }
         switch (arg->type) {
             case CONSOLE_ARG_TYPE_INT:
