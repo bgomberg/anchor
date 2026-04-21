@@ -51,11 +51,20 @@ static uint32_t m_history_len = 0;
 static int32_t m_history_index = -1;
 #endif
 
-static bool validate_arg_def(const console_arg_def_t* arg, bool is_last) {
+static bool validate_arg_def(const console_arg_def_t* arg, bool* has_optional) {
     switch (arg->type) {
         case CONSOLE_ARG_TYPE_INT:
         case CONSOLE_ARG_TYPE_STR:
-            return arg->name && (!arg->is_optional || is_last);
+            if (arg->name == NULL) {
+                return false;
+            }
+            if (arg->is_optional) {
+                *has_optional = true;
+            } else if (*has_optional) {
+                // optinoal args must be trailing
+                return false;
+            }
+            return true;
         default:
             return false;
     }
@@ -101,18 +110,22 @@ static uint32_t get_num_required_args(const console_command_def_t* cmd) {
     if (cmd->num_args == 0) {
         return 0;
     }
-    const console_arg_def_t* last_arg = &cmd->args[cmd->num_args-1];
-    switch (last_arg->type) {
-        case CONSOLE_ARG_TYPE_INT:
-        case CONSOLE_ARG_TYPE_STR:
-            if (last_arg->is_optional) {
-                return cmd->num_args - 1;
-            } else {
-                return cmd->num_args;
-            }
-        default:
-            return 0;
+
+    uint32_t required = cmd->num_args;
+    for (uint32_t i = 0; i < cmd->num_args; i++) {
+        const console_arg_def_t* arg = &cmd->args[i];
+        if (!arg->is_optional) {
+            continue;
+        }
+        switch (arg->type) {
+            case CONSOLE_ARG_TYPE_INT:
+            case CONSOLE_ARG_TYPE_STR:
+                required--;
+                break;
+        }
     }
+
+    return required;
 }
 #if CONSOLE_HISTORY
 static void history_add_line(void) {
@@ -222,14 +235,16 @@ static void process_line(void) {
     }
 
     if (num_args != cmd->num_args) {
-        // set the optional argument to its default value
-        switch (cmd->args[num_args].type) {
-            case CONSOLE_ARG_TYPE_INT:
-                cmd->args_ptr[num_args] = (void*)CONSOLE_INT_ARG_DEFAULT;
-                break;
-            case CONSOLE_ARG_TYPE_STR:
-                cmd->args_ptr[num_args] = (void*)CONSOLE_STR_ARG_DEFAULT;
-                break;
+        // set all missing optional arguments to their default values
+        for (uint32_t i = num_args; i < cmd->num_args; i++) {
+            switch (cmd->args[i].type) {
+                case CONSOLE_ARG_TYPE_INT:
+                    cmd->args_ptr[i] = (void*)CONSOLE_INT_ARG_DEFAULT;
+                    break;
+                case CONSOLE_ARG_TYPE_STR:
+                    cmd->args_ptr[i] = (void*)CONSOLE_STR_ARG_DEFAULT;
+                    break;
+            }
         }
     }
 
@@ -491,8 +506,9 @@ bool console_command_register(const console_command_def_t* cmd) {
         return false;
     }
     // validate the arguments
+    bool has_optional = false;
     for (uint32_t i = 0; i < cmd->num_args; i++) {
-        if (!validate_arg_def(cmd->args, i + 1 == cmd->num_args)) {
+        if (!validate_arg_def(cmd->args, &has_optional)) {
             return false;
         }
     }
