@@ -51,11 +51,20 @@ static uint32_t m_history_len = 0;
 static int32_t m_history_index = -1;
 #endif
 
-static bool validate_arg_def(const console_arg_def_t* arg) {
+static bool validate_arg_def(const console_arg_def_t* arg, bool* has_optional) {
     switch (arg->type) {
         case CONSOLE_ARG_TYPE_INT:
         case CONSOLE_ARG_TYPE_STR:
-            return arg->name != NULL;
+            if (arg->name == NULL) {
+                return false;
+            }
+            if (arg->is_optional) {
+                *has_optional = true;
+            } else if (*has_optional) {
+                // optinoal args must be trailing
+                return false;
+            }
+            return true;
         default:
             return false;
     }
@@ -103,13 +112,16 @@ static uint32_t get_num_required_args(const console_command_def_t* cmd) {
     }
 
     uint32_t required = cmd->num_args;
-    for (uint32_t i = cmd->num_args; i > 0; i--) {
-        const console_arg_def_t* arg = &cmd->args[i - 1];
-        if ((arg->type == CONSOLE_ARG_TYPE_INT || arg->type == CONSOLE_ARG_TYPE_STR) &&
-            arg->is_optional) {
-            required--;
-        } else {
-            break;
+    for (uint32_t i = 0; i < cmd->num_args; i++) {
+        const console_arg_def_t* arg = &cmd->args[i];
+        if (!arg->is_optional) {
+            continue:
+        }
+        switch (arg->type) {
+            case CONSOLE_ARG_TYPE_INT:
+            case CONSOLE_ARG_TYPE_STR:
+                required--;
+                break;
         }
     }
 
@@ -224,13 +236,13 @@ static void process_line(void) {
 
     if (num_args != cmd->num_args) {
         // set all missing optional arguments to their default values
-        for (uint32_t i = cmd->num_args; i > num_args; i--) {
-            switch (cmd->args[i - 1].type) {
+        for (uint32_t i = num_args; i < cmd->num_args; i++) {
+            switch (cmd->args[i].type) {
                 case CONSOLE_ARG_TYPE_INT:
-                    cmd->args_ptr[i - 1] = (void*)CONSOLE_INT_ARG_DEFAULT;
+                    cmd->args_ptr[i] = (void*)CONSOLE_INT_ARG_DEFAULT;
                     break;
                 case CONSOLE_ARG_TYPE_STR:
-                    cmd->args_ptr[i - 1] = (void*)CONSOLE_STR_ARG_DEFAULT;
+                    cmd->args_ptr[i] = (void*)CONSOLE_STR_ARG_DEFAULT;
                     break;
             }
         }
@@ -494,8 +506,9 @@ bool console_command_register(const console_command_def_t* cmd) {
         return false;
     }
     // validate the arguments
+    bool has_optional = false;
     for (uint32_t i = 0; i < cmd->num_args; i++) {
-        if (!validate_arg_def(cmd->args)) {
+        if (!validate_arg_def(cmd->args, &has_optional)) {
             return false;
         }
     }
