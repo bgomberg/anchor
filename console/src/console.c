@@ -367,7 +367,12 @@ static void do_tab_complete(void) {
         }
         num_matches++;
     }
-    const uint32_t completion_length = longest_common_prefix - (m_line_len - offset);
+    uint32_t completion_length = longest_common_prefix - (m_line_len - offset);
+    // a tab complete iterator can return a string longer than the line buffer
+    const uint32_t max_completion_length = CONSOLE_MAX_LINE_LENGTH - 1 - m_line_len;
+    if (completion_length > max_completion_length) {
+        completion_length = max_completion_length;
+    }
     if (num_matches == 0 || (num_matches == 1 && completion_length == 0)) {
         // nothing to auto-complete
         return;

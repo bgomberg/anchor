@@ -56,6 +56,7 @@ TEST(ConsoleTest, TestHelpCommand) {
     "  stroff    - Prints a string starting from an offset\n"
     "  multi_add - Add numbers with multiple optional args\n"
     "  greet     - Greet with optional name and title\n"
+    "  pick      - Pick a value\n"
     "> ");
 
   process_line("help add\n");

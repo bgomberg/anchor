@@ -7,11 +7,13 @@ extern "C" {
 };
 
 #include <cstring>
+#include <string>
 
 #define LEFT_ARROW_SEQUENCE   "\x1b[D"
 #define RIGHT_ARROW_SEQUENCE  "\x1b[C"
 
 extern std::vector<char> g_console_write_buffer;
+extern const std::string g_pick_choices[];
 
 #define EXPECT_WRITE_BUFFER(str) do { \
     g_console_write_buffer.push_back('\0'); \
@@ -273,6 +275,24 @@ TEST(ConsoleTest, TestTabComplete) {
 
   process_line("\n");
   EXPECT_WRITE_BUFFER("\nhi\n> ");
+}
+
+TEST(ConsoleTest, TestTabCompleteLongerThanLineBuffer) {
+  const std::string arg(CONSOLE_MAX_LINE_LENGTH - 1 - strlen("pick "), 'x');
+  const std::string full_line = "pick " + arg;
+
+  process_line("pick x");
+  EXPECT_WRITE_BUFFER("pick x");
+
+  process_line("\t");
+  EXPECT_WRITE_BUFFER(std::string(CONSOLE_MAX_LINE_LENGTH - 1 - strlen("pick x"), 'x').c_str());
+
+  // the line is full, so there is nothing left to complete
+  process_line("\t");
+  EXPECT_WRITE_BUFFER(("\n" + g_pick_choices[0] + " " + g_pick_choices[1] + "\n> " + full_line).c_str());
+
+  process_line("\n");
+  EXPECT_WRITE_BUFFER(("\npicked " + arg + "\n> ").c_str());
 }
 
 TEST(ConsoleTest, TestLeftRightArrow) {
