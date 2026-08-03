@@ -7,6 +7,7 @@ extern "C" {
 };
 
 #include <stdio.h>
+#include <string>
 
 #define CONSOLE_COMMAND_GET_INT_ARG(NAME) ({ \
     int _arg; \
@@ -51,6 +52,9 @@ CONSOLE_COMMAND_DEF(greet, "Greet with optional name and title",
   CONSOLE_OPTIONAL_STR_ARG_DEF(name, "Name to greet"),
   CONSOLE_OPTIONAL_STR_ARG_DEF(title, "Title prefix")
 );
+CONSOLE_COMMAND_DEF_WITH_TAB_COMPLETION(pick, "Pick a value",
+  CONSOLE_STR_ARG_DEF(choice, "The value to pick")
+);
 #else
 CONSOLE_COMMAND_DEF(say_hi);
 CONSOLE_COMMAND_DEF(say_bye);
@@ -73,6 +77,9 @@ CONSOLE_COMMAND_DEF(greet,
   CONSOLE_STR_ARG_DEF(greeting),
   CONSOLE_OPTIONAL_STR_ARG_DEF(name),
   CONSOLE_OPTIONAL_STR_ARG_DEF(title)
+);
+CONSOLE_COMMAND_DEF_WITH_TAB_COMPLETION(pick,
+  CONSOLE_STR_ARG_DEF(choice)
 );
 #endif
 
@@ -139,6 +146,29 @@ static void greet_command_handler(const greet_args_t* args) {
   write_function(buffer);
 }
 
+// longer than the line buffer, and identical apart from the last character
+extern const std::string g_pick_choices[] = {
+  std::string(CONSOLE_MAX_LINE_LENGTH, 'x') + "_a",
+  std::string(CONSOLE_MAX_LINE_LENGTH, 'x') + "_b",
+};
+
+static const char* pick_tab_complete_iterator(bool start) {
+  static size_t iter_index = 0;
+  if (start) {
+    iter_index = 0;
+  }
+  if (iter_index >= sizeof(g_pick_choices) / sizeof(g_pick_choices[0])) {
+    return NULL;
+  }
+  return g_pick_choices[iter_index++].c_str();
+}
+
+static void pick_command_handler(const pick_args_t* args) {
+  char buffer[CONSOLE_MAX_LINE_LENGTH + 16];
+  snprintf(buffer, sizeof(buffer), "picked %s\n", args->choice);
+  write_function(buffer);
+}
+
 int main(int argc, char **argv) {
   const console_init_t init_console = {
     .write_function = write_function,
@@ -152,6 +182,7 @@ int main(int argc, char **argv) {
   console_command_register(stroff);
   console_command_register(multi_add);
   console_command_register(greet);
+  console_command_register(pick);
 
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

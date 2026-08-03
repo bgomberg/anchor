@@ -46,6 +46,8 @@ static bool m_is_active;
 static uint32_t m_escape_sequence_index = 0;
 #if CONSOLE_HISTORY
 static char m_history_buffer[CONSOLE_HISTORY][CONSOLE_MAX_LINE_LENGTH] CONSOLE_BUFFER_ATTRIBUTES;
+_Static_assert(sizeof(m_history_buffer[0]) == sizeof(m_line_buffer),
+    "A history entry and the line buffer must be the same size");
 static uint32_t m_history_start_index = 0;
 static uint32_t m_history_len = 0;
 static int32_t m_history_index = -1;
@@ -134,7 +136,7 @@ static void history_add_line(void) {
         return;
     }
     const uint32_t history_write_index = (m_history_start_index + m_history_len + 1) % CONSOLE_HISTORY;
-    strcpy(m_history_buffer[history_write_index], m_line_buffer);
+    memcpy(m_history_buffer[history_write_index], m_line_buffer, m_line_len + 1);
     if (m_history_len == CONSOLE_HISTORY) {
         // history buffer is full, so drop the first element to clear room for the new one
         m_history_start_index = (m_history_start_index + 1) % CONSOLE_HISTORY;
@@ -365,7 +367,12 @@ static void do_tab_complete(void) {
         }
         num_matches++;
     }
-    const uint32_t completion_length = longest_common_prefix - (m_line_len - offset);
+    uint32_t completion_length = longest_common_prefix - (m_line_len - offset);
+    // a tab complete iterator can return a string longer than the line buffer
+    const uint32_t max_completion_length = CONSOLE_MAX_LINE_LENGTH - 1 - m_line_len;
+    if (completion_length > max_completion_length) {
+        completion_length = max_completion_length;
+    }
     if (num_matches == 0 || (num_matches == 1 && completion_length == 0)) {
         // nothing to auto-complete
         return;
@@ -572,9 +579,10 @@ void console_process(const uint8_t* data, uint32_t length) {
             }
             if (update_line_from_history) {
                 const char* history_line = (m_history_index == -1) ? "" : m_history_buffer[(m_history_start_index + m_history_len - m_history_index) % CONSOLE_HISTORY];
-                erase_current_line(strlen(history_line));
-                strcpy(m_line_buffer, history_line);
-                m_line_len = strlen(m_line_buffer);
+                const uint32_t history_line_len = strlen(history_line);
+                erase_current_line(history_line_len);
+                memcpy(m_line_buffer, history_line, history_line_len + 1);
+                m_line_len = history_line_len;
                 m_cursor_pos = m_line_len;
                 write_str(CONSOLE_PROMPT);
                 write_str(m_line_buffer);
