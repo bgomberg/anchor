@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "console/rust",
     "console/rust/macros",
+    "logging/rust",
 ]
 
 [workspace.package]

@@ -1,0 +1,11 @@
+[package]
+name = "anchor_logging"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+heapless = { version = "0.9", default-features = false }
+
+[lints]
+workspace = true
