@@ -2,6 +2,7 @@ use core::ffi::CStr;
 use core::iter;
 use core::ptr;
 use core::str;
+use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
 use heapless::Vec;
 
@@ -69,42 +70,52 @@ pub struct LineSnapshot<'a> {
 }
 
 pub struct ActiveLine<const LINE: usize> {
-    active: bool,
-    line_len: usize,
-    cursor_pos: usize,
-    tail: [u8; LINE],
-    tail_len: usize,
+    active: AtomicBool,
+    line_len: AtomicUsize,
+    cursor_pos: AtomicUsize,
+    tail_len: AtomicUsize,
+    tail: [AtomicU8; LINE],
 }
 
 impl<const LINE: usize> ActiveLine<LINE> {
     pub const fn new() -> Self {
-        Self { active: false, line_len: 0, cursor_pos: 0, tail: [0; LINE], tail_len: 0 }
+        Self {
+            active: AtomicBool::new(false),
+            line_len: AtomicUsize::new(0),
+            cursor_pos: AtomicUsize::new(0),
+            tail_len: AtomicUsize::new(0),
+            tail: [const { AtomicU8::new(0) }; LINE],
+        }
     }
 
     pub fn is_active(&self) -> bool {
-        self.active
+        self.active.load(Ordering::Acquire)
     }
 
-    pub fn release(&mut self) {
-        self.active = false;
+    pub fn release(&self) {
+        self.active.store(false, Ordering::Release);
     }
 
-    pub fn capture(&mut self, snapshot: &LineSnapshot<'_>) {
-        self.active = true;
-        self.line_len = snapshot.line_len;
-        self.cursor_pos = snapshot.cursor_pos;
-        self.tail_len = snapshot.tail.len();
-        self.tail[..self.tail_len].copy_from_slice(snapshot.tail);
+    pub fn capture(&self, snapshot: &LineSnapshot<'_>) {
+        self.line_len.store(snapshot.line_len, Ordering::Relaxed);
+        self.cursor_pos.store(snapshot.cursor_pos, Ordering::Relaxed);
+        self.tail_len.store(snapshot.tail.len(), Ordering::Relaxed);
+        for (slot, &byte) in self.tail.iter().zip(snapshot.tail) {
+            slot.store(byte, Ordering::Relaxed);
+        }
+        self.active.store(true, Ordering::Release);
     }
 
-    pub fn print_line(&mut self, text: &[u8], out: &mut impl Write) {
-        if text.len() < self.line_len {
-            if self.cursor_pos != self.line_len {
-                out.write(&self.tail[..self.tail_len]);
-                self.cursor_pos = self.line_len;
+    pub fn print_line(&self, text: &[u8], out: &mut impl Write) {
+        let line_len = self.line_len.load(Ordering::Relaxed);
+        if text.len() < line_len {
+            if self.cursor_pos.swap(line_len, Ordering::Relaxed) != line_len {
+                for slot in &self.tail[..self.tail_len.load(Ordering::Relaxed)] {
+                    out.write(&[slot.load(Ordering::Relaxed)]);
+                }
             }
-            write_repeat(out, b"\x08", self.line_len - text.len());
-            write_repeat(out, b" ", self.line_len - text.len());
+            write_repeat(out, b"\x08", line_len - text.len());
+            write_repeat(out, b" ", line_len - text.len());
         }
         out.write(b"\r");
         out.write(text);
